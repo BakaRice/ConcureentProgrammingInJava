@@ -61,3 +61,75 @@ public final void setDaemon(boolean on){
 ```
 
 ### 1.3 线程状态转化 - stack log 解读
+
+```
+"TimeWaitingThread" #22 prio=5 os_prio=0 cpu=0.00ms elapsed=72.16s tid=0x0000025b55099800 nid=0x3b5c waiting on condition  [0x000000c10f5ff000]
+   java.lang.Thread.State: TIMED_WAITING (sleeping)
+        at java.lang.Thread.sleep(java.base@11.0.13/Native Method)
+        at com.ricemarch.TimeWaiting.run(ReadStackLog.java:19)
+        at java.lang.Thread.run(java.base@11.0.13/Thread.java:829)
+
+"WaitingThread" #23 prio=5 os_prio=0 cpu=0.00ms elapsed=72.16s tid=0x0000025b550a4000 nid=0x150c in Object.wait()  [0x000000c10f6ff000]
+   java.lang.Thread.State: WAITING (on object monitor)
+        at java.lang.Object.wait(java.base@11.0.13/Native Method)
+        - waiting on <0x0000000713996940> (a java.lang.Class for com.ricemarch.Waiting)
+        at java.lang.Object.wait(java.base@11.0.13/Object.java:328)
+        at com.ricemarch.Waiting.run(ReadStackLog.java:35)
+        - waiting to re-lock in wait() <0x0000000713996940> (a java.lang.Class for com.ricemarch.Waiting)
+        at java.lang.Thread.run(java.base@11.0.13/Thread.java:829)
+
+"BlockedThread-1" #24 prio=5 os_prio=0 cpu=0.00ms elapsed=72.16s tid=0x0000025b550a6000 nid=0x5790 waiting on condition  [0x000000c10f7fe000]
+   java.lang.Thread.State: TIMED_WAITING (sleeping)
+        at java.lang.Thread.sleep(java.base@11.0.13/Native Method)
+        at com.ricemarch.Blocked.run(ReadStackLog.java:51)
+        - locked <0x0000000713997c60> (a java.lang.Class for com.ricemarch.Blocked)
+        at java.lang.Thread.run(java.base@11.0.13/Thread.java:829)
+
+"BlockedThread-2" #25 prio=5 os_prio=0 cpu=0.00ms elapsed=72.16s tid=0x0000025b550a7000 nid=0x56f4 waiting for monitor entry  [0x000000c10f8ff000]      
+   java.lang.Thread.State: BLOCKED (on object monitor)
+        at com.ricemarch.Blocked.run(ReadStackLog.java:51)
+        - waiting to lock <0x0000000713997c60> (a java.lang.Class for com.ricemarch.Blocked)
+        at java.lang.Thread.run(java.base@11.0.13/Thread.java:829)
+
+```
+
+### 1.4 线程状态转化及源码解读
+
+```java
+public enum State {
+    //初始
+    NEW,
+
+    //运行中
+    RUNNABLE,
+
+    //阻塞
+    //BLOCKED状态 针对 sync 锁
+    BLOCKED,
+
+    //等待
+    //Object#wait()
+    //Thread#join()
+    //LockSupport#park()
+    WAITING,
+
+    //超时等待
+    //Thread.sleep
+    //Object.wait(long)
+    //Thread.join
+    //LockSupport.parkNanos
+    //LockSupport.parkUntil
+    TIMED_WAITING,
+
+    //终止
+    TERMINATED;
+} 
+```
+
+BLOCKED状态 针对 sync 锁
+
+线程初始化 - 源码解析
+
+一个新构造的线程对象是由其parent线程来进行空间分配的，而child线程继承了parent是否为daemon、优先级和加载资源的contextClassLoader以及可继承的ThreadLocal，同时还会分配一个唯一的ID来标识这个child线程（synchronized加锁）。至此，一个能够运行的线程对象就初始化好了，在堆内存中等待着运行。
+
+线程对象在初始化完成之后，调用start方法就可以启动这个线程。线程start()方法的含义是：当前线程（即parent线程）同步告知java虚拟机，只要线程规划器空闲，应立即调用start()方法的线程。
